@@ -528,6 +528,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "axksym"
+version = "0.2.0"
+dependencies = [
+ "lazyinit",
+ "rustc-demangle",
+]
+
+[[package]]
 name = "axlog"
 version = "0.2.0"
 dependencies = [

@@ -17,7 +17,7 @@ members = [
     "modules/axsync",
     "modules/axtask",
     "modules/axipi",
-
+    "modules/axksym",
     "api/axfeat",
 ]
 

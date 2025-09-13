@@ -152,6 +152,7 @@ APP_NAME := $(shell basename $(APP))
 OUT_ELF := $(OUT_DIR)/$(APP_NAME)_$(PLAT_NAME).elf
 OUT_BIN := $(patsubst %.elf,%.bin,$(OUT_ELF))
 OUT_UIMG := $(patsubst %.elf,%.uimg,$(OUT_ELF))
+OUT_KSYM := $(OUT_DIR)/kallsyms
 ifeq ($(UIMAGE), y)
   FINAL_IMG := $(OUT_UIMG)
 else
@@ -175,7 +176,7 @@ defconfig:
 oldconfig:
 	$(call oldconfig)
 
-build: $(OUT_DIR) $(FINAL_IMG)
+build: $(OUT_DIR) $(FINAL_IMG) $(OUT_KSYM)
 
 disasm:
 	$(OBJDUMP) $(OUT_ELF) | less

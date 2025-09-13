@@ -60,6 +60,12 @@ ifeq ($(BACKTRACE), y)
 	$(call run_cmd,./scripts/make/dwarf.sh,$(OUT_ELF) $(OBJCOPY))
 endif
 
+$(OUT_KSYM): _cargo_build
+	@echo "Generating kernel symbols at $@"
+	nm -n -C $(OUT_ELF) | grep ' [Tt] ' | grep -v '\.L' | grep -v '$$x' > ./tmp_kallsyms
+	RUSTFLAGS= cargo run --manifest-path ./modules/axksym/Cargo.toml --bin gen_ksym --features=demangle -- ./tmp_kallsyms > $@
+	@rm -f ./tmp_kallsyms
+
 $(OUT_DIR):
 	$(call run_cmd,mkdir,-p $@)
 
