@@ -13,7 +13,12 @@ lazyinit = { workspace = true }
 
 [features]
 demangle = ["dep:rustc-demangle"]
+assembly = []
 
 [[bin]]
 name = "gen_ksym"
+required-features = ["demangle"]
+
+[[bin]]
+name = "gen_ksym_as"
 required-features = ["demangle"]
