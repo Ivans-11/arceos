@@ -18,7 +18,10 @@
 
 #![cfg_attr(not(test), no_std)]
 #![feature(doc_auto_cfg)]
+#![feature(panic_can_unwind)]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
 #[macro_use]
 extern crate axlog;
 

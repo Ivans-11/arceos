@@ -34,7 +34,8 @@ else ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), all build run just
   else ifeq ($(APP_TYPE), rust)
     RUSTFLAGS += $(RUSTFLAGS_LINK_ARGS)
     ifeq ($(BACKTRACE), y)
-      RUSTFLAGS += -C force-frame-pointers -C debuginfo=2 -C strip=none
+#       RUSTFLAGS += -C force-frame-pointers -C debuginfo=2 -C strip=none
+	  RUSTFLAGS += -Cforce-unwind-tables=yes -Cpanic=unwind -Clink-arg=--eh-frame-hdr
     endif
     ifeq ($(MYPLAT), axplat-loongarch64-2k1000la)
       RUSTFLAGS += -C target-feature=-ual
@@ -57,12 +58,18 @@ else ifeq ($(APP_TYPE), c)
 	$(call cargo_build,ulib/axlibc,$(AX_FEAT) $(LIB_FEAT))
 endif
 ifeq ($(BACKTRACE), y)
-	$(call run_cmd,./scripts/make/dwarf.sh,$(OUT_ELF) $(OBJCOPY))
+# 	$(call run_cmd,./scripts/make/dwarf.sh,$(OUT_ELF) $(OBJCOPY))
 endif
 
 $(OUT_KSYM): _cargo_build
+	@if ! command -v gen_ksym >/dev/null 2>&1; then \
+		echo "Installing gen_ksym..."; \
+		RUSTFLAGS= cargo install --git https://github.com/Starry-OS/ksym --features=demangle; \
+	else \
+		echo "gen_ksym already installed."; \
+	fi
 	@echo "Generating kernel symbols at $@"
-	nm -n -C $(OUT_ELF) | grep ' [Tt] ' | grep -v '\.L' | grep -v '$$x' | RUSTFLAGS= cargo run --manifest-path ./modules/axksym/Cargo.toml --bin gen_ksym --features=demangle > $@
+	nm -n -C $(OUT_ELF) | grep ' [Tt] ' | grep -v '\.L' | grep -v '$$x' | RUSTFLAGS= gen_ksym > $@
 
 $(OUT_DIR):
 	$(call run_cmd,mkdir,-p $@)

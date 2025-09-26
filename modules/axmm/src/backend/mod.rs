@@ -35,7 +35,7 @@ fn alloc_to_linux_error(err: AllocError) -> AxError {
     }
 }
 
-fn alloc_frame(zeroed: bool, size: PageSize) -> AxResult<PhysAddr> {
+pub fn alloc_frame(zeroed: bool, size: PageSize) -> AxResult<PhysAddr> {
     let page_size = size as usize;
     let num_pages = page_size / PAGE_SIZE_4K;
     let vaddr = VirtAddr::from(
@@ -51,7 +51,7 @@ fn alloc_frame(zeroed: bool, size: PageSize) -> AxResult<PhysAddr> {
     Ok(paddr)
 }
 
-fn dealloc_frame(frame: PhysAddr, align: PageSize) {
+pub fn dealloc_frame(frame: PhysAddr, align: PageSize) {
     let vaddr = phys_to_virt(frame);
     let page_size: usize = align.into();
     let num_pages = page_size / PAGE_SIZE_4K;

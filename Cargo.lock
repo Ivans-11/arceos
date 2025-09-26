@@ -528,14 +528,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axksym"
-version = "0.2.0"
-dependencies = [
- "lazyinit",
- "rustc-demangle",
-]
-
-[[package]]
 name = "axlog"
 version = "0.2.0"
 dependencies = [
@@ -737,7 +729,9 @@ dependencies = [
  "chrono",
  "crate_interface",
  "indoc",
+ "ksym",
  "percpu",
+ "unwinding",
 ]
 
 [[package]]
@@ -1640,6 +1634,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ksym"
+version = "0.1.0"
+source = "git+https://github.com/Starry-OS/ksym?rev=1e37536#1e375363290449aaf2a9b681773eea958f38880d"
+dependencies = [
+ "lazyinit",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2480,6 +2482,15 @@ name = "unicode-width"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
+
+[[package]]
+name = "unwinding"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60612c845ef41699f39dc8c5391f252942c0a88b7d15da672eff0d14101bbd6d"
+dependencies = [
+ "gimli",
+]
 
 [[package]]
 name = "utf8parse"
