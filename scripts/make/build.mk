@@ -35,7 +35,9 @@ else ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), all build run just
     RUSTFLAGS += $(RUSTFLAGS_LINK_ARGS)
     ifeq ($(BACKTRACE), y)
 #       RUSTFLAGS += -C force-frame-pointers -C debuginfo=2 -C strip=none
-	  RUSTFLAGS += -Cforce-unwind-tables=yes -Cpanic=unwind -Clink-arg=--eh-frame-hdr
+		ifneq ($(ARCH), loongarch64)
+	  		RUSTFLAGS += -Cforce-unwind-tables=yes -Cpanic=unwind -Clink-arg=--eh-frame-hdr
+		endif
     endif
     ifeq ($(MYPLAT), axplat-loongarch64-2k1000la)
       RUSTFLAGS += -C target-feature=-ual
