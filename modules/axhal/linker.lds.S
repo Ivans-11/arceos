@@ -95,6 +95,17 @@ SECTIONS
         _ex_table_end = .;
     }
 
+    __static_keys : ALIGN(4K) {
+        __start___static_keys = .;
+        KEEP(*(.static_keys .static_keys.*))
+    }
+    __stop___static_keys = .;
+
+    .tracepoint : ALIGN(4K) {
+        PROVIDE(__start_tracepoint = .);
+        KEEP(*(.tracepoint .tracepoint.*))
+        PROVIDE(__stop_tracepoint = .);
+    }
     .tdata : ALIGN(0x10) {
         _stdata = .;
         *(.tdata .tdata.*)
