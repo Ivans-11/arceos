@@ -58,6 +58,31 @@ pub fn dealloc_frame(frame: PhysAddr, align: PageSize) {
     global_allocator().dealloc_pages(vaddr.as_usize(), num_pages, UsageKind::UserMem);
 }
 
+pub fn alloc_frames(
+    zeroed: bool,
+    size: PageSize,
+    nums: usize,
+    kind: UsageKind,
+) -> AxResult<PhysAddr> {
+    let page_size = size as usize;
+    let vaddr = VirtAddr::from(
+        global_allocator()
+            .alloc_pages(nums, page_size, kind)
+            .map_err(alloc_to_linux_error)?,
+    );
+    if zeroed {
+        unsafe { core::ptr::write_bytes(vaddr.as_mut_ptr(), 0, page_size * nums) };
+    }
+    let paddr = virt_to_phys(vaddr);
+
+    Ok(paddr)
+}
+
+pub fn dealloc_frames(frames: PhysAddr, nums: usize) {
+    let vaddr = phys_to_virt(frames);
+    global_allocator().dealloc_pages(vaddr.as_usize(), nums, UsageKind::UserMem);
+}
+
 fn paging_to_ax_error(err: PagingError) -> AxError {
     warn!("Paging error: {:?}", err);
     match err {
