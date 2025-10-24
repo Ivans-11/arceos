@@ -27,6 +27,8 @@ extern crate axlog;
 
 #[cfg(all(target_os = "none", not(test)))]
 mod lang_items;
+#[cfg(all(target_os = "none", not(test)))]
+pub use lang_items::{set_panic_helper, PanicHelper};
 
 #[cfg(feature = "smp")]
 mod mp;

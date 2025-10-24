@@ -83,7 +83,7 @@ percpu = "0.2"
 rand = "0.9"
 scope-local = "0.1"
 spin = "0.10"
-ksym = { git = "https://github.com/Starry-OS/ksym", rev = "1e37536" }
+ksym = { git = "https://github.com/Starry-OS/ksym", rev = "8fa0df1" }
 
 [patch.crates-io]
 axbacktrace = { git = "https://github.com/Starry-OS/axbacktrace.git" }

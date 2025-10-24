@@ -730,6 +730,7 @@ dependencies = [
  "crate_interface",
  "indoc",
  "ksym",
+ "lazyinit",
  "percpu",
  "unwinding",
 ]

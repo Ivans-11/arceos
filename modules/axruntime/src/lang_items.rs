@@ -1,5 +1,18 @@
 use core::panic::PanicInfo;
 
+use lazyinit::LazyInit;
+pub trait PanicHelper: Send + Sync {
+    /// Looks up the symbol name and its base address by the given address.
+    fn lookup_symbol<'a>(&self, addr: usize, buf: &'a mut [u8; 1024]) -> Option<(&'a str, usize)>;
+}
+
+static PANIC_HELPER: LazyInit<&'static dyn PanicHelper> = LazyInit::new();
+
+/// Sets the panic helper.
+pub fn set_panic_helper(helper: &'static dyn PanicHelper) {
+    PANIC_HELPER.init_once(helper);
+}
+
 #[cfg(any(not(feature = "alloc"), target_arch = "loongarch64"))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -8,14 +21,14 @@ fn panic(info: &PanicInfo) -> ! {
     axhal::power::system_off()
 }
 
-#[cfg(all(feature = "alloc", not(target_arch = "loongarch64")))]
+#[cfg(not(target_arch = "loongarch64"))]
 mod unwind {
     use alloc::boxed::Box;
     use core::{ffi::c_void, sync::atomic::AtomicBool};
-    use super::PanicInfo;
 
-    use ksym::lookup_kallsyms;
     use unwinding::abi::{_Unwind_Backtrace, _Unwind_GetIP, UnwindContext, UnwindReasonCode};
+
+    use super::PanicInfo;
 
     static RECURSION: AtomicBool = AtomicBool::new(false);
     #[derive(Debug)]
@@ -59,6 +72,7 @@ mod unwind {
             unwind_ctx: &UnwindContext<'_>,
             arg: *mut c_void,
         ) -> UnwindReasonCode {
+            let mut name_buf = [0u8; 1024];
             let data = unsafe { &mut *(arg as *mut CallbackData) };
             if data.kernel_main {
                 // If we are in kernel_main, we don't need to print the backtrace.
@@ -67,7 +81,9 @@ mod unwind {
             data.counter += 1;
             let pc = _Unwind_GetIP(unwind_ctx);
             if pc > 0 {
-                let res = lookup_kallsyms(pc);
+                let res = super::PANIC_HELPER
+                    .get()
+                    .and_then(|helper| helper.lookup_symbol(pc, &mut name_buf));
                 if let Some((name, addr)) = res {
                     if name.contains("main") {
                         data.kernel_main = true;

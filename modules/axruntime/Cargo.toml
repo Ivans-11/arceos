@@ -48,6 +48,7 @@ crate_interface = { workspace = true }
 indoc = "2"
 percpu = { workspace = true, optional = true }
 ksym = { workspace = true }
+lazyinit = { workspace = true }
 
 [target.'cfg(not(target_arch = "loongarch64"))'.dependencies]
 unwinding = { version = "=0.2.8", default-features = false, features = [
