@@ -2,6 +2,7 @@ use core::time::Duration;
 
 use axerrno::{AxError, AxResult, LinuxError};
 use enum_dispatch::enum_dispatch;
+use smoltcp::wire::IpAddress;
 
 macro_rules! define_options {
     ($($name:ident($value:ty),)*) => {
@@ -44,6 +45,37 @@ impl UnixCredentials {
     }
 }
 
+/// Ip address for IP_MULTICAST_IF option.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IpAddr {
+    V4(core::net::Ipv4Addr),
+    V6(core::net::Ipv6Addr),
+}
+
+impl Default for IpAddr {
+    fn default() -> Self {
+        IpAddr::V4(core::net::Ipv4Addr::UNSPECIFIED)
+    }
+}
+
+impl From<IpAddress> for IpAddr {
+    fn from(addr: IpAddress) -> Self {
+        match addr {
+            IpAddress::Ipv4(a) => IpAddr::V4(a),
+            IpAddress::Ipv6(a) => IpAddr::V6(a),
+        }
+    }
+}
+
+impl Into<IpAddress> for IpAddr {
+    fn into(self) -> IpAddress {
+        match self {
+            IpAddr::V4(a) => IpAddress::Ipv4(a),
+            IpAddr::V6(a) => IpAddress::Ipv6(a),
+        }
+    }
+}
+
 define_options! {
     // ---- Socket level options (SO_*) ----
     ReuseAddress(bool),
@@ -65,6 +97,10 @@ define_options! {
 
     // ---- IP level options (IP_*) ----
     Ttl(u8),
+    MulticastTtl(u8),
+    MulticastLoop(bool),
+    MulticastIf(IpAddr),
+    AddMembership((IpAddr, IpAddr)),
 
     // ---- Extra options ----
     NonBlocking(bool),

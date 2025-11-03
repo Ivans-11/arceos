@@ -116,6 +116,7 @@ impl EthernetDevice {
         if !repr.dst_addr.is_broadcast()
             && repr.dst_addr != EMPTY_MAC
             && repr.dst_addr != self.hardware_address()
+            && !repr.dst_addr.is_multicast()
         {
             return false;
         }
@@ -297,6 +298,39 @@ impl Device for EthernetDevice {
                 EthernetProtocol::Ipv4,
             );
             return false;
+        }
+
+        if next_hop.is_multicast() {
+            match next_hop {
+                IpAddress::Ipv4(ipv4) => {
+                    // IPv4 multicast -> Ethernet 01:00:5e:0x:xx:xx (lower 23 bits)
+                    let o = ipv4.octets();
+                    let mac = EthernetAddress([
+                        0x01,
+                        0x00,
+                        0x5e,
+                        o[1] & 0x7f,
+                        o[2],
+                        o[3],
+                    ]);
+                    Self::send_to(&mut self.inner, mac, packet.len(), |b| b.copy_from_slice(packet), EthernetProtocol::Ipv4);
+                    return false;
+                }
+                IpAddress::Ipv6(ipv6) => {
+                    // IPv6 multicast -> Ethernet 33:33:xx:xx:xx:xx (low 32 bits)
+                    let o = ipv6.octets();
+                    let mac = EthernetAddress([
+                        0x33,
+                        0x33,
+                        o[12],
+                        o[13],
+                        o[14],
+                        o[15],
+                    ]);
+                    Self::send_to(&mut self.inner, mac, packet.len(), |b| b.copy_from_slice(packet), EthernetProtocol::Ipv6);
+                    return false;
+                }
+            }
         }
 
         let need_request = match self.neighbors.get(&next_hop) {

@@ -1,4 +1,4 @@
-use core::task::Waker;
+use core::{any::Any, task::Waker};
 
 use smoltcp::{storage::PacketBuffer, time::Instant, wire::IpAddress};
 
@@ -12,7 +12,7 @@ pub use loopback::*;
 #[cfg(feature = "vsock")]
 pub use vsock::*;
 
-pub trait Device: Send + Sync {
+pub trait Device: Send + Sync + Any {
     #[allow(unused)]
     fn name(&self) -> &str;
 

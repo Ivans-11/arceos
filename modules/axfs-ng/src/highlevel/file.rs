@@ -281,7 +281,7 @@ impl OpenOptions {
         match (self.write, self.append) {
             (true, false) => {}
             (false, false) => {
-                if self.truncate || self.create || self.create_new {
+                if self.truncate || self.create_new {
                     return false;
                 }
             }

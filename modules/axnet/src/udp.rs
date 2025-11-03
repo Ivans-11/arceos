@@ -1,4 +1,5 @@
 use alloc::vec;
+use alloc::vec::Vec;
 use core::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     task::Context,
@@ -25,11 +26,10 @@ use crate::{
     poll_interfaces,
 };
 
-pub(crate) fn new_udp_socket() -> smol::Socket<'static> {
-    // TODO(mivik): buffer size
+pub(crate) fn new_udp_socket(rx_buf_len: Option<usize>, tx_buf_len: Option<usize>) -> smol::Socket<'static> {
     smol::Socket::new(
-        smol::PacketBuffer::new(vec![PacketMetadata::EMPTY; 256], vec![0; UDP_RX_BUF_LEN]),
-        smol::PacketBuffer::new(vec![PacketMetadata::EMPTY; 256], vec![0; UDP_TX_BUF_LEN]),
+        smol::PacketBuffer::new(vec![PacketMetadata::EMPTY; 256], vec![0; rx_buf_len.unwrap_or(UDP_RX_BUF_LEN)]),
+        smol::PacketBuffer::new(vec![PacketMetadata::EMPTY; 256], vec![0; tx_buf_len.unwrap_or(UDP_TX_BUF_LEN)]),
     )
 }
 
@@ -40,13 +40,19 @@ pub struct UdpSocket {
     peer_addr: RwLock<Option<(IpEndpoint, IpAddress)>>,
 
     general: GeneralOptions,
+
+    ttl: RwLock<u8>,
+    multicast_ttl: RwLock<u8>,
+    multicast_loop: RwLock<bool>,
+    multicast_if: RwLock<Option<IpAddress>>,
+    multi_groups: RwLock<Vec<(IpAddress, IpAddress)>>,
 }
 
 impl UdpSocket {
     /// Creates a new UDP socket.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let socket = new_udp_socket();
+        let socket = new_udp_socket(None, None);
         let handle = SOCKET_SET.add(socket);
 
         Self {
@@ -55,6 +61,12 @@ impl UdpSocket {
             peer_addr: RwLock::new(None),
 
             general: GeneralOptions::new(),
+
+            ttl: RwLock::new(64),
+            multicast_ttl: RwLock::new(64),
+            multicast_loop: RwLock::new(false),
+            multicast_if: RwLock::new(None),
+            multi_groups: RwLock::new(Vec::new()),
         }
     }
 
@@ -79,15 +91,26 @@ impl Configurable for UdpSocket {
         }
         match option {
             O::Ttl(ttl) => {
-                self.with_smol_socket(|socket| {
-                    **ttl = socket.hop_limit().unwrap_or(64);
-                });
+                **ttl = *self.ttl.read();
             }
             O::SendBuffer(size) => {
-                **size = UDP_TX_BUF_LEN;
+                self.with_smol_socket(|socket| {
+                    **size = socket.payload_send_capacity();
+                });
             }
             O::ReceiveBuffer(size) => {
-                **size = UDP_RX_BUF_LEN;
+                self.with_smol_socket(|socket| {
+                    **size = socket.payload_recv_capacity();
+                });
+            }
+            O::MulticastTtl(ttl) => {
+                **ttl = *self.multicast_ttl.read();
+            }
+            O::MulticastLoop(loopback) => {
+                **loopback = *self.multicast_loop.read();
+            }
+            O::MulticastIf(addr) => {
+                **addr = self.multicast_if.read().clone().unwrap_or(IpAddress::Ipv4(Ipv4Addr::UNSPECIFIED)).into();
             }
             _ => return Ok(false),
         }
@@ -97,14 +120,52 @@ impl Configurable for UdpSocket {
     fn set_option_inner(&self, option: SetSocketOption) -> AxResult<bool> {
         use SetSocketOption as O;
 
-        if self.general.set_option_inner(option)? {
+        if self.general.set_option_inner(option)? && !matches!(option, O::SendBuffer(_) | O::ReceiveBuffer(_)) {
             return Ok(true);
         }
         match option {
             O::Ttl(ttl) => {
+                *self.ttl.write() = *ttl;
+            }
+            O::SendBuffer(size) => {
                 self.with_smol_socket(|socket| {
-                    socket.set_hop_limit(Some(*ttl));
+                    let mut new_socket = new_udp_socket(Some(socket.payload_recv_capacity()), Some(*size * 2));
+                    core::mem::swap(socket, &mut new_socket);
                 });
+            }
+            O::ReceiveBuffer(size) => {
+                self.with_smol_socket(|socket| {
+                    let mut new_socket = new_udp_socket(Some(*size * 2), Some(socket.payload_send_capacity()));
+                    core::mem::swap(socket, &mut new_socket);
+                });
+            }
+            O::MulticastTtl(ttl) => {
+                *self.multicast_ttl.write() = *ttl;
+            }
+            O::MulticastLoop(loopback) => {
+                *self.multicast_loop.write() = *loopback;
+            }
+            O::MulticastIf(addr) => {
+                let addr: IpAddress = (*addr).into();
+                *self.multicast_if.write() = Some(addr);
+            }
+            O::AddMembership((multi_addr, interface_addr)) => {
+                let multi_addr: IpAddress = (*multi_addr).into();
+                let interface_addr: IpAddress = (*interface_addr).into();
+                self.multi_groups.write().push((multi_addr, interface_addr));
+
+                SERVICE.lock().iface.join_multicast_group(multi_addr).ok();
+                
+                let mut mask = 0u32;
+                if interface_addr.is_unspecified() {
+                    mask = u32::MAX;
+                } else if let Some(idx) = SERVICE.lock().lookup_device(&interface_addr) {
+                    mask = 1u32 << idx;
+                }
+                if mask != 0 {
+                    let new_mask = self.general.device_mask() | mask;
+                    self.general.set_device_mask(new_mask);
+                }
             }
             _ => return Ok(false),
         }
@@ -193,12 +254,25 @@ impl SocketOps for UdpSocket {
                 } else if !socket.can_send() {
                     Err(AxError::WouldBlock)
                 } else {
+                    let mut local_addr = source_addr;
+                    let mut ttl = *self.ttl.read();
+                    if remote_addr.addr.is_multicast() {
+                        if let Some(ifaddr) = self.multicast_if.read().clone() {
+                            if !ifaddr.is_unspecified() {
+                                local_addr = ifaddr;
+                            }
+                        }
+                        ttl = *self.multicast_ttl.read();
+                    }
+
+                    socket.set_hop_limit(Some(ttl));
+
                     let buf = socket
                         .send(
                             src.remaining(),
                             UdpMetadata {
                                 endpoint: remote_addr,
-                                local_address: Some(source_addr),
+                                local_address: Some(local_addr),
                                 meta: PacketMeta::default(),
                             },
                         )
@@ -246,6 +320,15 @@ impl SocketOps for UdpSocket {
                     };
                     match result {
                         Ok((src, meta)) => {
+                            if let Some(local_addr) = meta.local_address {
+                                if local_addr.is_multicast() {
+                                    let groups = self.multi_groups.read();
+                                    if !groups.iter().any(|(m, _if)| m == &local_addr) {
+                                        return Err(AxError::WouldBlock);
+                                    }
+                                }
+                            }
+
                             match &mut expected_remote {
                                 ExpectedRemote::Any(remote_addr) => {
                                     **remote_addr = SocketAddrEx::Ip(meta.endpoint.into());

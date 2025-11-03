@@ -347,7 +347,7 @@ impl AddrSpace {
                         }
                         if n == 0 {
                             warn!("No pages populated for {vaddr:?} ({flags:?})");
-                            false
+                            true
                         } else {
                             true
                         }

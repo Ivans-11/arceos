@@ -4,6 +4,7 @@ use core::{
     time::Duration,
 };
 
+use alloc::{boxed::Box, vec::Vec};
 use axhal::time::{NANOS_PER_MICROS, wall_time_nanos};
 use axtask::future::sleep_until;
 use smoltcp::{
@@ -80,5 +81,14 @@ impl Service {
                 }
             }
         }
+    }
+
+    pub fn devices(&self) -> &Vec<Box<dyn crate::device::Device>> {
+        &self.router.devices
+    }
+
+    pub fn lookup_device(&self, src_addr: &IpAddress) -> Option<usize> {
+        let rule = self.router.table.lookup_with_src(src_addr)?;
+        Some(rule.dev)
     }
 }

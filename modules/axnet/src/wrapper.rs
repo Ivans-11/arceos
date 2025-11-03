@@ -63,6 +63,9 @@ impl<'a> SocketSetWrapper<'a> {
                     }
                 }
                 Socket::Udp(s) => {
+                    if s.endpoint().addr == None && addr.is_unspecified() && s.endpoint().port == port {
+                        return Err(AxError::AddressInUse);
+                    }
                     if s.endpoint().addr == Some(addr) && s.endpoint().port == port {
                         return Err(AxError::AddressInUse);
                     }

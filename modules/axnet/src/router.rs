@@ -55,7 +55,15 @@ impl RouteTable {
     pub fn lookup(&self, dst: &IpAddress) -> Option<&Rule> {
         self.rules
             .iter()
-            .find(|rule| rule.filter.contains_addr(dst))
+            .filter(|rule| rule.filter.contains_addr(dst))
+            .max_by_key(|rule| rule.filter.prefix_len())
+    }
+
+    pub fn lookup_with_src(&self, src: &IpAddress) -> Option<&Rule> {
+        self.rules
+            .iter()
+            .filter(|rule| &rule.src == src)
+            .max_by_key(|rule| rule.filter.prefix_len())
     }
 }
 
@@ -106,7 +114,7 @@ impl Router {
                     let packet = smoltcp::wire::Ipv4Packet::new_checked(packet)
                         .expect("got invalid IPv4 packet");
                     let dst_addr = IpAddress::Ipv4(packet.dst_addr());
-                    if packet.dst_addr().is_broadcast() {
+                    if packet.dst_addr().is_broadcast() || packet.dst_addr().is_multicast() {
                         let buf = packet.into_inner();
                         for dev in &mut self.devices {
                             poll_next |= dev.send(dst_addr, buf, timestamp);

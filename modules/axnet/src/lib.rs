@@ -34,6 +34,7 @@ pub mod udp;
 pub mod unix;
 #[cfg(feature = "vsock")]
 pub mod vsock;
+pub mod netlink;
 mod wrapper;
 
 use alloc::{borrow::ToOwned, boxed::Box};
